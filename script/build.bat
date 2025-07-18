@@ -1,0 +1,1 @@
+pyinstaller --onefile  --add-data "migrations;migrations"  main.py  --icon=icon.ico --noconsole
