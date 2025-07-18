@@ -1,0 +1,5 @@
+peewee==3.18.2
+peewee-migrate==1.13.0
+PyQt6==6.9.1
+PyQt6-Qt6==6.9.1
+PyQt6_sip==13.10.2
