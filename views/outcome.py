@@ -185,11 +185,10 @@ class Form(QDialog):
             self.accept()
         else:
             QMessageBox.warning(self, "Update Failed", "Could not update the record.")
-    
-    def export_file(self):
+            
+    def _build_filled_workbook(self):
         if not self.validated():
-            QMessageBox.warning(self, "Export Failed", "Vui lòng điền đầy đủ thông tin trước khi xuất file.")
-            return
+            return None, "Vui lòng điền đầy đủ thông tin trước khi in/xuất file."
         
         template_path = os.path.join(BASE_DIR, "templates", "PHIEU_CHI.xlsx")
 
@@ -212,11 +211,19 @@ class Form(QDialog):
             "{CHIEF_ACCOUNTANT_NAME}": Setting.get_value("chief_accountant", ""),
             "{TREASURER_NAME}": Setting.get_value("treasurer", ""),
         }
-
+        
         for row in sheet.iter_rows():
             for cell in row:
                 if isinstance(cell.value, str) and cell.value in values:
                     cell.value = values[cell.value]
+                    
+        return workbook, None
+    
+    def export_file(self):
+        workbook, err = self._build_filled_workbook()
+        if err:
+            QMessageBox.warning(self, "Xuất file lỗi", err)
+            return
 
         save_path, _ = QFileDialog.getSaveFileName(self, "Lưu phiếu thu", "PhieuChi.xlsx", "Excel Files (*.xlsx)")
         if save_path:
