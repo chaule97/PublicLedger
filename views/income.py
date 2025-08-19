@@ -266,6 +266,11 @@ class IncomeView(QWidget):
         hbox1.addWidget(back_button)
 
         hbox1.addStretch()
+        
+        self.delete_button = QPushButton("Xóa")
+        self.delete_button.setVisible(False)
+        self.delete_button.clicked.connect(self.deleteSelected)
+        hbox1.addWidget(self.delete_button)
 
         add_button = QPushButton("Thêm")
         add_button.clicked.connect(self.addButtonClicked)
@@ -293,8 +298,16 @@ class IncomeView(QWidget):
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table.cellDoubleClicked.connect(self.cellClicked)
+        
+        table.itemSelectionChanged.connect(self.onSelectionChanged)
+        
         return table
 
+
+    def onSelectionChanged(self):
+        selected = self.table.selectionModel().selectedRows()
+        self.delete_button.setVisible(len(selected) == 1)
+    
     
     def createTableSummary(self):
         table = QTableWidget()
@@ -362,3 +375,40 @@ class IncomeView(QWidget):
 
         if self.form.updated:
             self.loadData()
+           
+            
+    def deleteSelected(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+
+        id_item = self.table.item(row, 0)
+        if id_item is None or not id_item.text().strip().isdigit():
+            QMessageBox.warning(self, "Lỗi", "Không xác định được bản ghi để xoá.")
+            return
+
+        record_id = int(id_item.text())
+        
+        date = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+        note = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
+
+        reply = QMessageBox.question(
+            self,
+            "Xác nhận xoá",
+            f"Bạn có chắc muốn xoá bản ghi của “{date}: {note}”?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                ok = FinanceController.delete_entry(record_id)
+            except Exception as e:
+                ok = False
+
+            if ok:
+                self.loadData()
+                self.delete_button.setVisible(False)  # Ẩn lại sau khi xoá
+                QMessageBox.information(self, "Thành công", "Đã xoá bản ghi.")
+            else:
+                QMessageBox.warning(self, "Xoá thất bại", "Không thể xoá bản ghi.")
