@@ -326,5 +326,17 @@ class LedgerTableView(QWidget):
         # Save dialog
         save_path, _ = QFileDialog.getSaveFileName(self, "Lưu sổ quỹ", "So_Quy.xlsx", "Excel Files (*.xlsx)")
         if save_path:
-            workbook.save(save_path)
-            QMessageBox.information(self, "Thành công", f"Sổ quỹ đã được lưu tại:\n{save_path}")
+            try:
+                workbook.save(save_path)
+                QMessageBox.information(self, "Thành công", f"Sổ quỹ đã được lưu tại:\n{save_path}")
+            except PermissionError:
+                QMessageBox.warning(
+                    self,
+                    "Không thể lưu file",
+                    "File đang được mở ở ứng dụng khác (ví dụ Excel).\n"
+                    "Vui lòng đóng file và thử lại.",
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self, "Lỗi không xác định", f"Không thể lưu file:\n{e}"
+                )

@@ -200,7 +200,7 @@ class Form(QDialog):
             "{USER_NAME}": self.name_input.text(),
             "{ADDRESS}": self.address_input.text(),
             "{REASON}": self.reason_input.text(),
-            "{AMOUNT}": f"{int(self.amount_input.text().replace(',', '')):,}",
+            "{AMOUNT}": self.amount_input.text().replace(',', '.'),
             "{AMOUNT_TEXT}": self.amount_text_label.text(),
             "{DESCRIPTION}": self.description_input.text(),
             "{DEPARTMENT}": Setting.get_value("department", ""),
@@ -220,8 +220,20 @@ class Form(QDialog):
 
         save_path, _ = QFileDialog.getSaveFileName(self, "Lưu phiếu thu", "PhieuChi.xlsx", "Excel Files (*.xlsx)")
         if save_path:
-            workbook.save(save_path)
-            QMessageBox.information(self, "Thành công", f"Phiếu thu đã được lưu tại:\n{save_path}")
+            try:
+                workbook.save(save_path)
+                QMessageBox.information(self, "Thành công", f"Phiếu thu đã được lưu tại:\n{save_path}")
+            except PermissionError:
+                QMessageBox.warning(
+                    self,
+                    "Không thể lưu file",
+                    "File đang được mở ở ứng dụng khác (ví dụ Excel).\n"
+                    "Vui lòng đóng file và thử lại.",
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self, "Lỗi không xác định", f"Không thể lưu file:\n{e}"
+                )
 
 
 class OutcomeView(QWidget):
