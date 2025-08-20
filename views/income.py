@@ -1,5 +1,6 @@
 import datetime
 import os
+import tempfile
 from PyQt6.QtWidgets import (
     QWidget,
     QFormLayout,
@@ -24,6 +25,7 @@ from PyQt6.QtGui import QFont, QIntValidator, QGuiApplication
 from PyQt6 import QtCore
 from calendar import monthrange
 from utils.vietnamese_currency import convert_number_to_vietnamese
+from utils.print_with_excel import save_temp_workbook, select_printer_name, print_with_excel
 from controllers.finance_controller import FinanceController
 from models import IncomeOutcome, Setting
 from settings import BASE_DIR
@@ -91,11 +93,15 @@ class Form(QDialog):
         cancel_button = QPushButton("Hủy")
         cancel_button.clicked.connect(self.close)
         
+        print_button = QPushButton("In")
+        print_button.clicked.connect(self.print_file)
+        
         export_button = QPushButton("Xuất file")
         export_button.clicked.connect(self.export_file)
         
         button_layout = QHBoxLayout()
         button_layout.addWidget(submit_button)
+        button_layout.addWidget(print_button)
         button_layout.addWidget(export_button)
         button_layout.addWidget(cancel_button)
         form_layout.addRow(button_layout)
@@ -217,6 +223,44 @@ class Form(QDialog):
                     cell.value = values[cell.value]
 
         return workbook, None
+
+    def print_file(self):
+        # 1) Tạo workbook từ template
+        workbook, err = self._build_filled_workbook()
+        if err:
+            QMessageBox.warning(self, "In lỗi", err)
+            return
+
+        # 2) Lưu tạm
+        try:
+            tmp_path = save_temp_workbook(workbook)
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Không thể tạo file tạm để in:\n{e}")
+            return
+
+        # 3) Hỏi máy in (hoặc bỏ qua để dùng mặc định)
+        printer_name = select_printer_name(self)  # cho người dùng chọn
+        if printer_name is None:
+            # Người dùng bấm Cancel → có thể hủy in hoặc dùng máy in mặc định
+            # Nếu muốn dùng mặc định, comment return và để None
+            return
+
+        # 4) In bằng Excel COM
+        try:
+            print_with_excel(tmp_path, printer_name=printer_name, copies=1)
+            QMessageBox.information(self, "Đã gửi lệnh in", "Phiếu thu đang được gửi tới máy in.")
+        except ImportError:
+            # Fallback nhanh: nếu chưa cài pywin32, thử dùng os.startfile (máy in mặc định, ít kiểm soát)
+            try:
+                if os.name == "nt":
+                    os.startfile(tmp_path, "print")
+                    QMessageBox.information(self, "Đã gửi lệnh in", "Đã gửi lệnh in tới máy in mặc định.")
+                else:
+                    QMessageBox.warning(self, "Không hỗ trợ", "Chỉ hỗ trợ in tự động trên Windows.")
+            except Exception as e:
+                QMessageBox.critical(self, "Lỗi in", f"Không thể in file:\n{e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi in", f"Không thể in file bằng Excel:\n{e}")
 
     def export_file(self):
         workbook, err = self._build_filled_workbook()
