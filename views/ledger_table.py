@@ -172,11 +172,11 @@ class LedgerTableView(QWidget):
 
             # Phiếu thu
             if entry.type == IncomeOutcome.INCOME:
-                self.table.setItem(row_index, 1, QTableWidgetItem("1"))
+                self.table.setItem(row_index, 1, QTableWidgetItem(str(entry.voucher_no)))
                 self.table.setItem(row_index, 4, QTableWidgetItem(f"{entry.amount:,}"))
             # Phiếu chi
             else:
-                self.table.setItem(row_index, 2, QTableWidgetItem("1"))
+                self.table.setItem(row_index, 2, QTableWidgetItem(str(entry.voucher_no)))
                 self.table.setItem(row_index, 5, QTableWidgetItem(f"{entry.amount:,}"))
 
             # Cột 3: Diễn giải
@@ -262,12 +262,12 @@ class LedgerTableView(QWidget):
             # Điền dữ liệu
             sheet.cell(row=current_row, column=1, value=entry.date.strftime("%d/%m/%Y"))
             if entry.type == IncomeOutcome.INCOME:
-                sheet.cell(row=current_row, column=2, value="1")
+                sheet.cell(row=current_row, column=2, value=f"{entry.voucher_no}")
                 sheet.cell(row=current_row, column=5, value=entry.amount)
                 total_income += entry.amount
                 running_balance += entry.amount
             else:
-                sheet.cell(row=current_row, column=3, value="1")
+                sheet.cell(row=current_row, column=3, value=f"{entry.voucher_no}")
                 sheet.cell(row=current_row, column=6, value=entry.amount)
                 total_outcome += entry.amount
                 running_balance -= entry.amount
@@ -282,7 +282,7 @@ class LedgerTableView(QWidget):
                 total_row_idx = row_idx
                 break
 
-        sheet.delete_rows(total_row_idx - 1, 1)
+        total_row_idx += 1
         sheet.cell(row=total_row_idx - 1, column=5, value=total_income)
         sheet.cell(row=total_row_idx - 1, column=6, value=total_outcome)
         sheet.cell(row=total_row_idx - 1, column=7, value=running_balance)

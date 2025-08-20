@@ -1,6 +1,5 @@
 import datetime
 import os
-import tempfile
 from PyQt6.QtWidgets import (
     QWidget,
     QFormLayout,
@@ -33,6 +32,7 @@ from settings import BASE_DIR
 
 headers = [
     'ID',
+    "Số phiếu",
     "Ngày",
     "Người nộp",
     "Nội dung",
@@ -42,7 +42,7 @@ headers = [
 
 class Form(QDialog):
 
-    def __init__(self, parent=None, month=1, year=datetime.date.today().year, edit=False, id=None):
+    def __init__(self, parent=None, month=1, year=datetime.date.today().year, id=None):
         self.month = month
         self.year = year
         self.updated = False
@@ -89,6 +89,7 @@ class Form(QDialog):
         form_layout.addRow(date_label, self.date_input)
 
         submit_button = QPushButton("Lưu")
+        submit_button.clicked.connect(self.save)
     
         cancel_button = QPushButton("Hủy")
         cancel_button.clicked.connect(self.close)
@@ -108,12 +109,12 @@ class Form(QDialog):
 
         self.setLayout(form_layout)
 
-        if not edit:
-            submit_button.clicked.connect(self.insert)
+        if not id:
             self.setWindowTitle("Thêm thu")
         else:
-            submit_button.clicked.connect(self.update)
-            self.setWindowTitle("Sửa")
+            entry = FinanceController.get_entry(self.id)
+            
+            self.setWindowTitle(f"Phiếu Số {entry.voucher_no}")
             
         self.amount_input.textChanged.connect(self.format_amount_input)     
             
@@ -152,56 +153,58 @@ class Form(QDialog):
 
         return all(conditions)
 
-    
-    def insert(self):
+    def _save(self):
         if not self.validated():
             return
 
-        data = {
-            'type': IncomeOutcome.INCOME,
-            'name': self.name_input.text(),
-            'address': self.address_input.text(),
-            'reason': self.reason_input.text(),
-            'amount': int(self.amount_input.text().replace(",", "")),
-            'description': self.description_input.text(),
-            'date': datetime.date(self.year, self.month, self.date_input.value()),
-        }
+        if self.id:
+            data = {
+                "name": self.name_input.text().strip(),
+                "address": self.address_input.text().strip(),
+                "reason": self.reason_input.text().strip(),
+                "amount": int(self.amount_input.text().replace(",", "").strip()),
+                "description": self.description_input.text().strip(),
+                "date": datetime.date(self.year, self.month, self.date_input.value()),
+            }
+            
+            result = FinanceController.update_entry(self.id, data)
 
-        FinanceController.add_entry(data)
-        self.updated = True
-        self.accept()
+            if result:
+                self.updated = True
+            else:
+                QMessageBox.warning(self, "Update Failed", "Không thể cập nhật.")
+        else:    
+            data = {
+                'type': IncomeOutcome.INCOME,
+                'name': self.name_input.text(),
+                'address': self.address_input.text(),
+                'reason': self.reason_input.text(),
+                'amount': int(self.amount_input.text().replace(",", "")),
+                'description': self.description_input.text(),
+                'date': datetime.date(self.year, self.month, self.date_input.value()),
+            }
 
-    def update(self):
-        if not self.validated():
-            return
-        
-        data = {
-            "name": self.name_input.text().strip(),
-            "address": self.address_input.text().strip(),
-            "reason": self.reason_input.text().strip(),
-            "amount": int(self.amount_input.text().replace(",", "").strip()),
-            "description": self.description_input.text().strip(),
-            "date": datetime.date(self.year, self.month, self.date_input.value()),
-        }
-        
-        result = FinanceController.update_entry(self.id, data)
-
-        if result:
+            result = FinanceController.add_entry(data)
+            self.id = result.id
+            self.setWindowTitle(f"Phiếu Số {result.voucher_no}")
             self.updated = True
-            self.accept()
-        else:
-            QMessageBox.warning(self, "Update Failed", "Could not update the record.")
+    
+    def save(self):
+        self._save()
+        QMessageBox.information(self, "Success", "Đã lưu thành công.")
             
     def _build_filled_workbook(self):
-        if not self.validated():
-            return None, "Vui lòng điền đầy đủ thông tin trước khi in/xuất file."
+        self._save()
 
         template_path = os.path.join(BASE_DIR, "templates", "PHIEU_THU.xlsx")
         workbook = load_workbook(template_path)
         sheet = workbook.active
         
+        entry = FinanceController.get_entry(self.id)
+        
         values = {
             "{USER_NAME}": self.name_input.text(),
+            "{NUMBER}": entry.voucher_no,
             "{ADDRESS}": self.address_input.text(),
             "{REASON}": self.reason_input.text(),
             "{AMOUNT}": self.amount_input.text().replace(',', '.'),
@@ -357,8 +360,8 @@ class IncomeView(QWidget):
         table.setColumnCount(len(headers))
         table.setHorizontalHeaderLabels(headers)
         table.setColumnHidden(0, True)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         table.cellDoubleClicked.connect(self.cellClicked)
         
         table.itemSelectionChanged.connect(self.onSelectionChanged)
@@ -393,10 +396,11 @@ class IncomeView(QWidget):
         self.table.setRowCount(len(entries))
         for row, entry in enumerate(entries):
             self.table.setItem(row, 0, QTableWidgetItem(str(entry.id)))
-            self.table.setItem(row, 1, QTableWidgetItem(entry.date.strftime("%d/%m/%Y")))
-            self.table.setItem(row, 2, QTableWidgetItem(entry.name))
-            self.table.setItem(row, 3, QTableWidgetItem(entry.reason))
-            self.table.setItem(row, 4, QTableWidgetItem(f"{entry.amount:,}"))
+            self.table.setItem(row, 1, QTableWidgetItem(str(entry.voucher_no)))
+            self.table.setItem(row, 2, QTableWidgetItem(entry.date.strftime("%d/%m/%Y")))
+            self.table.setItem(row, 3, QTableWidgetItem(entry.name))
+            self.table.setItem(row, 4, QTableWidgetItem(entry.reason))
+            self.table.setItem(row, 5, QTableWidgetItem(f"{entry.amount:,}"))
 
     def backButtonClicked(self):
         from .home import Home
@@ -424,7 +428,7 @@ class IncomeView(QWidget):
         if not record:
             return
         
-        self.form = Form(month=self.month, year=self.year, edit=True, id=record_id)
+        self.form = Form(month=self.month, year=self.year, id=record_id)
         self.form.name_input.setText(record.name)
         self.form.address_input.setText(record.address or "")
         self.form.reason_input.setText(record.reason or "")

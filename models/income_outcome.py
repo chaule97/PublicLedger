@@ -16,6 +16,8 @@ class IncomeOutcome(Model):
     amount = IntegerField()
     description = CharField(null=True)
     date = DateField()
+    voucher_year = IntegerField(default=lambda: datetime.date.today().year, null=True)
+    voucher_no = IntegerField(null=True)
     created_at = DateTimeField(default=datetime.datetime.now)
     
     class Meta:
